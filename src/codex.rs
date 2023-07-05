@@ -6,6 +6,8 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::collections::HashMap;
 
+use rand::Rng;
+
 
 pub struct Codex {
     history: Vec<CodexAction>,
@@ -33,7 +35,6 @@ pub enum Correctness {
 }
 
 pub struct WordEntry {
-    word: String,
     knowledge_score: f32,  // Between 0 and 1, weighted more heavily based on recent practices.
     definition: String,
 }
@@ -155,7 +156,7 @@ impl Codex {
         };
 
         file.write(self.history.iter()
-            .map(|e| e.to_string())
+            .map(|e| e.to_string().trim().to_owned())
             .collect::<Vec<String>>()
             .join("\n")
             .as_bytes()
@@ -167,16 +168,37 @@ impl Codex {
 
         match action {
             CodexAction::Introduce(word, conf, def) => {
-                self.words.insert(word.clone(), WordEntry {word, knowledge_score: conf.to_float(), definition: def});
+                self.words.insert(word.clone(), WordEntry {knowledge_score: conf.to_float(), definition: def});
             }
             CodexAction::Practice(word, corr) => {
                 let entry = self.words.get_mut(&word).expect("word exists");
-                entry.knowledge_score =  0.25 * corr.to_float() + 0.75 * entry.knowledge_score;
+                // println!("{} -> {}", entry.knowledge_score, 0.25 * corr.to_float() + 0.75 * entry.knowledge_score);
+                entry.knowledge_score = 0.25 * corr.to_float() + 0.75 * entry.knowledge_score;
             }
         };
     }
 
     pub fn contains(&self, word: &str) -> bool {
         self.words.contains_key(word)
+    }
+
+    pub fn num_words(&self) -> i32 {
+        self.words.len().try_into().expect("Assumes fewer than x billion words")
+    }
+
+    pub fn generate_practice_set(&self, count: usize) -> Vec<(String, String)> {
+        let count = std::cmp::min(count, self.words.len());
+        
+        let mut scored_words: Vec<(f32, &str)> = self.words.iter()
+            .map(|(word, entry)| (entry.knowledge_score + rand::thread_rng().gen_range(-0.05 .. 0.05), word.as_str()))  // Fuzz!
+            .collect();
+
+        scored_words
+            .sort_by(|(score_a, _), (score_b, _)| score_a.partial_cmp(score_b)  // Ascending
+            .expect("Could compare floats"));
+
+        scored_words[..count].into_iter()
+            .map(|(_, word)| ((*word).to_owned(), self.words.get(*word).expect("word found").definition.to_owned()))
+            .collect()
     }
 }

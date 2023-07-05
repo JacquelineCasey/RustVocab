@@ -3,8 +3,8 @@ mod prompt;
 mod codex;
 
 
-use codex::{Codex, Confidence, CodexAction};
-use prompt::Prompt;
+use codex::{Codex, Confidence, Correctness, CodexAction};
+use prompt::{Prompt, ChoicePrompt, ValidatedFieldPrompt};
 
 use std::path::PathBuf;
 
@@ -19,7 +19,7 @@ enum MainAction {
 
 fn get_file_path() -> PathBuf {
     return loop {
-        let file_prompt = prompt::ValidatedFieldPrompt::new(
+        let file_prompt = ValidatedFieldPrompt::new(
             "Enter a file path...", 
             |s| {
                 let mut path = PathBuf::from(s);
@@ -44,7 +44,7 @@ fn get_file_path() -> PathBuf {
             break path
         }
         else {
-            let create_file_anyways = prompt::ChoicePrompt::<bool>::new("That file does not exist. Should we create it? (y/n)")
+            let create_file_anyways = ChoicePrompt::<bool>::new("That file does not exist. Should we create it? (y/n)")
                 .add_choice(vec!["yes", "y", "Y"], true)
                 .add_choice(vec!["no", "n", "N"], false)
                 .run_with_reprompt("Please enter \"y\" or \"n\"... ");
@@ -61,7 +61,7 @@ fn introduce(codex: &mut Codex) {
     println!("Introducing new vocab. Type \"!done\" to finish.");
 
     loop {
-        let prompt = prompt::ValidatedFieldPrompt::new("Type a word to add (or !done): ", |s| {
+        let prompt = ValidatedFieldPrompt::new("Type a word to add (or !done): ", |s| {
             if s.contains('$') {
                 println!("Word cannot contain $");
                 false
@@ -94,7 +94,7 @@ fn introduce(codex: &mut Codex) {
             println!("Note: \"{}\" already in codex. This will overwrite it. Type !done to abort.", word);
         }
 
-        let prompt = prompt::ValidatedFieldPrompt::new("Type the definition: ", |s| {
+        let prompt = ValidatedFieldPrompt::new("Type the definition: ", |s| {
             if s.contains('$') {
                 println!("Defintion cannot contain $");
                 false
@@ -118,7 +118,7 @@ fn introduce(codex: &mut Codex) {
             break;
         }
 
-        let mut prompt = prompt::ChoicePrompt::<Confidence>::new("How confidently do you know this word?");
+        let mut prompt = ChoicePrompt::<Confidence>::new("How confidently do you know this word?");
         prompt.add_choice(vec!["Known", "known", "k"], Confidence::Known);
         prompt.add_choice(vec!["Partial", "partial", "p"], Confidence::PartiallyKnown);
         prompt.add_choice(vec!["Unknown", "unknown", "u"], Confidence::Unknown);
@@ -128,6 +128,39 @@ fn introduce(codex: &mut Codex) {
         codex.process_action(CodexAction::Introduce(word.clone(), conf, def));
 
         println!("Added \"{}\" to codex", word);
+    }
+}
+
+fn practice(codex: &mut Codex) {
+    let num = ValidatedFieldPrompt::new(
+        "How many words?", 
+        |s| s.trim().parse::<i32>().is_ok() && s.trim().parse::<i32>().unwrap() > 0
+    ).run();
+
+    if let Some(num) = num {
+        let num: usize = num.trim()
+            .parse::<i32>()
+            .unwrap()
+            .try_into()
+            .expect("checked into to usize should work.");
+        
+        for (word, def) in codex.generate_practice_set(num) {
+            println!("Do you known \"{}\"?", word);
+            println!("Hit enter to show definition...");
+
+            let mut buf = String::new();
+            std::io::stdin().read_line(&mut buf).expect("stdin should work.");
+
+            println!("\"{}\": {}", word, def);
+
+            let correctness = ChoicePrompt::<Correctness>::new("Were you correct? ([c]orrect, [p]artially correct, [i]ncorrect)")
+                .add_choice(vec!["correct", "Correct", "c"], Correctness::Correct)
+                .add_choice(vec!["partially correct", "Partially correct", "partial", "p"], Correctness::PartiallyCorrect)
+                .add_choice(vec!["incorrect", "Incorrect", "i"], Correctness::Incorrect)
+                .run_with_reprompt("");
+
+            codex.process_action(CodexAction::Practice(word, correctness));
+        }
     }
 }
 
@@ -143,10 +176,10 @@ fn main() {
 
     let mut codex = codex::Codex::from_file(&path).expect("File parsed to Codex.");
 
-    println!("File opened.");
+    println!("File opened. Found {} words.", codex.num_words());
 
     loop {
-        let mut main_prompt = prompt::ChoicePrompt::<MainAction>::new("What would you like to do next?");
+        let mut main_prompt = ChoicePrompt::<MainAction>::new("What would you like to do next?");
         main_prompt
             .add_choice(vec!["quit", "q", "exit"], MainAction::Exit)
             .add_choice(vec!["introduce", "i"], MainAction::Introduce)
@@ -157,8 +190,11 @@ fn main() {
                 println!("Saving and Exiting.");
                 break;
             }
-            MainAction::Introduce => introduce(&mut codex),
-            MainAction::Practice => println!("Practicing vocab [not yet implemented]"),
+            MainAction::Introduce => {
+                introduce(&mut codex);
+                println!("Now there are {} word.", codex.num_words());
+            }
+            MainAction::Practice => practice(&mut codex),
         }
     }
 
