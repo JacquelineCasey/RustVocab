@@ -45,9 +45,9 @@ fn get_file_path() -> PathBuf {
         }
         else {
             let create_file_anyways = ChoicePrompt::<bool>::new("That file does not exist. Should we create it? (y/n)")
-                .add_choice(vec!["yes", "y", "Y"], true)
-                .add_choice(vec!["no", "n", "N"], false)
-                .run_with_reprompt("Please enter \"y\" or \"n\"... ");
+                .add_choice(vec!["yes", "Yes", "y", "Y"], true)
+                .add_choice(vec!["no", "No", "n", "N"], false)
+                .run_with_reprompt("Please enter \"y\" or \"n\"...");
 
             if create_file_anyways {
                 std::fs::File::create(&path).expect("File could be created.");
@@ -61,17 +61,17 @@ fn introduce(codex: &mut Codex) {
     println!("Introducing new vocab. Type \"!done\" to finish.");
 
     loop {
-        let prompt = ValidatedFieldPrompt::new("Type a word to add (or !done): ", |s| {
+        let word = ValidatedFieldPrompt::new("Type a word to add (or !done): ", |s| {
             if s.contains('$') {
-                println!("Word cannot contain $");
+                println!("Word cannot contain '$'.");
                 false
             }
             else if s.contains(' ') {
-                println!("Word cannot contain space");
+                println!("Word cannot contain space.");
                 false
             }
             else if s.trim().len() == 0 {
-                println!("Word not found");
+                println!("Word not found.");
                 false
             }
             else if s.trim().chars().nth(0) == Some('!') && s.trim() != "!done" {
@@ -81,9 +81,7 @@ fn introduce(codex: &mut Codex) {
             else {
                 true
             }
-        });
-        
-        let word = prompt.run_with_reprompt("").trim().to_owned();
+        }).run_with_reprompt("").trim().to_owned();
 
         if word == "!done" {
             println!("Finished introducing words.");
@@ -94,13 +92,13 @@ fn introduce(codex: &mut Codex) {
             println!("Note: \"{}\" already in codex. This will overwrite it. Type !done to abort.", word);
         }
 
-        let prompt = ValidatedFieldPrompt::new("Type the definition: ", |s| {
+        let def = ValidatedFieldPrompt::new("Type the definition: ", |s| {
             if s.contains('$') {
-                println!("Defintion cannot contain $");
+                println!("Defintion cannot contain '$'.");
                 false
             }
             else if s.trim().len() == 0 {
-                println!("Definition not found");
+                println!("Definition not found.");
                 false
             }
             else if word.trim().chars().nth(0) == Some('!') && word.trim() != "!done" {
@@ -110,24 +108,22 @@ fn introduce(codex: &mut Codex) {
             else {
                 true
             }
-        });
+        }).run_with_reprompt("").trim().to_owned();
 
-        let def = prompt.run_with_reprompt("");
         if def == "!done" {
             println!("Finished introducing words.");
             break;
         }
 
-        let mut prompt = ChoicePrompt::<Confidence>::new("How confidently do you know this word?");
-        prompt.add_choice(vec!["Known", "known", "k"], Confidence::Known);
-        prompt.add_choice(vec!["Partial", "partial", "p"], Confidence::PartiallyKnown);
-        prompt.add_choice(vec!["Unknown", "unknown", "u"], Confidence::Unknown);
-
-        let conf = prompt.run_with_reprompt("Unrecognized option.");
+        let conf = ChoicePrompt::<Confidence>::new("How confidently do you know this word? ([k]nown, [p]artially known, [u]nknown)")
+            .add_choice(vec!["known", "Known", "k", "K"], Confidence::Known)
+            .add_choice(vec!["partial", "Partial", "p", "P"], Confidence::PartiallyKnown)
+            .add_choice(vec!["unknown", "Unknown", "u", "U"], Confidence::Unknown)
+            .run_with_reprompt("Unrecognized option.");
 
         codex.process_action(CodexAction::Introduce(word.clone(), conf, def));
 
-        println!("Added \"{}\" to codex", word);
+        println!("Added \"{}\" to codex.", word);
     }
 }
 
@@ -154,9 +150,9 @@ fn practice(codex: &mut Codex) {
             println!("\"{}\": {}", word, def);
 
             let correctness = ChoicePrompt::<Correctness>::new("Were you correct? ([c]orrect, [p]artially correct, [i]ncorrect)")
-                .add_choice(vec!["correct", "Correct", "c"], Correctness::Correct)
-                .add_choice(vec!["partially correct", "Partially correct", "partial", "p"], Correctness::PartiallyCorrect)
-                .add_choice(vec!["incorrect", "Incorrect", "i"], Correctness::Incorrect)
+                .add_choice(vec!["correct", "Correct", "c", "C"], Correctness::Correct)
+                .add_choice(vec!["partially correct", "Partially correct", "partial", "Partial", "p", "P"], Correctness::PartiallyCorrect)
+                .add_choice(vec!["incorrect", "Incorrect", "i", "I"], Correctness::Incorrect)
                 .run_with_reprompt("");
 
             codex.process_action(CodexAction::Practice(word, correctness));
@@ -179,20 +175,20 @@ fn main() {
     println!("File opened. Found {} words.", codex.num_words());
 
     loop {
-        let mut main_prompt = ChoicePrompt::<MainAction>::new("What would you like to do next?");
-        main_prompt
-            .add_choice(vec!["quit", "q", "exit"], MainAction::Exit)
-            .add_choice(vec!["introduce", "i"], MainAction::Introduce)
-            .add_choice(vec!["practice", "p"], MainAction::Practice);
+        let action = ChoicePrompt::<MainAction>::new("What would you like to do next?")
+            .add_choice(vec!["quit", "Quit", "q", "Q", "exit", "Exit"], MainAction::Exit)
+            .add_choice(vec!["introduce", "Introduce", "i", "I"], MainAction::Introduce)
+            .add_choice(vec!["practice", "Practice", "p", "P"], MainAction::Practice)
+            .run_with_reprompt("Sorry, I didn't understand that...");
 
-        match main_prompt.run_with_reprompt("Sorry, I didn't understand that...") {
+        match action {
             MainAction::Exit => {
                 println!("Saving and Exiting.");
                 break;
             }
             MainAction::Introduce => {
                 introduce(&mut codex);
-                println!("Now there are {} word.", codex.num_words());
+                println!("Now there are {} words.", codex.num_words());
             }
             MainAction::Practice => practice(&mut codex),
         }
