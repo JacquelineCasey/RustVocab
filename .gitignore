@@ -1,5 +1,5 @@
 /target
 .vscode/*
 
-# My lists reside in these .codex files.
+
 *.codex

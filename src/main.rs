@@ -36,7 +36,7 @@ fn get_file_path() -> PathBuf {
         );
 
         let path = PathBuf::from(match file_prompt.run() {
-            Some(s) => s,
+            Some(s) => s.trim().to_owned(),
             None => continue,
         });
 
@@ -175,7 +175,7 @@ fn main() {
     println!("File opened. Found {} words.", codex.num_words());
 
     loop {
-        let action = ChoicePrompt::<MainAction>::new("What would you like to do next?")
+        let action = ChoicePrompt::<MainAction>::new("What would you like to do next? ([q]uit, [i]ntroduce, [p]ractice)")
             .add_choice(vec!["quit", "Quit", "q", "Q", "exit", "Exit"], MainAction::Exit)
             .add_choice(vec!["introduce", "Introduce", "i", "I"], MainAction::Introduce)
             .add_choice(vec!["practice", "Practice", "p", "P"], MainAction::Practice)
