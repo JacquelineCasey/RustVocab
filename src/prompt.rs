@@ -23,7 +23,7 @@ pub trait Prompt<T: Clone> {
         
         let ret_val = match io::stdin().read_line(&mut buf) {
             Err(_) => panic!("stdin failed!"), // TODO: More graceful handling of this error
-            Ok(_) => self.handle_input(&buf)
+            Ok(_) => self.handle_input(buf.trim())
         };
 
         println!("");
