@@ -141,7 +141,7 @@ fn practice(codex: &mut Codex) {
             .expect("checked into to usize should work.");
         
         for (word, def) in codex.generate_practice_set(num) {
-            println!("Do you known \"{}\"?", word);
+            println!("Do you know \"{}\"?", word);
             println!("Hit enter to show definition...");
 
             let mut buf = String::new();
@@ -155,7 +155,13 @@ fn practice(codex: &mut Codex) {
                 .add_choice(vec!["incorrect", "Incorrect", "i", "I"], Correctness::Incorrect)
                 .run_with_reprompt("");
 
-            codex.process_action(CodexAction::Practice(word, correctness));
+            let prev_knowledge = codex.word_knowledge(&word).unwrap_or(-1.0);
+
+            codex.process_action(CodexAction::Practice(word.clone(), correctness));
+
+            let final_knowledge = codex.word_knowledge(&word).unwrap_or(-1.0);
+
+            println!("({:.2}% -> {:.2}%)", prev_knowledge * 100.0, final_knowledge * 100.0);
         }
     }
 }
@@ -173,6 +179,7 @@ fn main() {
     let mut codex = codex::Codex::from_file(&path).expect("File parsed to Codex.");
 
     println!("File opened. Found {} words.", codex.num_words());
+    println!("Average knowledge: {:.2}%", codex.average_knowledge() * 100.0);
 
     loop {
         let action = ChoicePrompt::<MainAction>::new("What would you like to do next? ([q]uit, [i]ntroduce, [p]ractice)")
@@ -190,7 +197,10 @@ fn main() {
                 introduce(&mut codex);
                 println!("Now there are {} words.", codex.num_words());
             }
-            MainAction::Practice => practice(&mut codex),
+            MainAction::Practice => {
+                practice(&mut codex);
+                println!("Average knowledge: {:.2}%", codex.average_knowledge() * 100.0);
+            } 
         }
     }
 

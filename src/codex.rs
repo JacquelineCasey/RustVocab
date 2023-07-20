@@ -7,7 +7,11 @@ use std::str::FromStr;
 use std::collections::HashMap;
 
 use rand::Rng;
+use rand::seq::SliceRandom;
 
+pub enum CodexError{
+    WordNotFound (String)
+}
 
 pub struct Codex {
     history: Vec<CodexAction>,
@@ -173,7 +177,7 @@ impl Codex {
             CodexAction::Practice(word, corr) => {
                 let entry = self.words.get_mut(&word).expect("word exists");
                 // println!("{} -> {}", entry.knowledge_score, 0.25 * corr.to_float() + 0.75 * entry.knowledge_score);
-                entry.knowledge_score = 0.25 * corr.to_float() + 0.75 * entry.knowledge_score;
+                entry.knowledge_score = 0.50 * corr.to_float() + 0.50 * entry.knowledge_score;
             }
         };
     }
@@ -197,8 +201,27 @@ impl Codex {
             .sort_by(|(score_a, _), (score_b, _)| score_a.partial_cmp(score_b)  // Ascending
             .expect("Could compare floats"));
 
-        scored_words[..count].into_iter()
+        let mut set: Vec<(String, String)> = scored_words[..count].into_iter()
             .map(|(_, word)| ((*word).to_owned(), self.words.get(*word).expect("word found").definition.to_owned()))
-            .collect()
+            .collect();
+
+        set.shuffle(&mut rand::thread_rng());
+
+        set            
+    }
+
+    pub fn average_knowledge(&self) -> f32 {
+        let sum = self.words.iter()
+            .map(|(_, entry)| entry.knowledge_score)
+            .sum::<f32>();
+
+        sum / self.words.len() as f32
+    }
+
+    pub fn word_knowledge(&self, word: &str) -> Result<f32, CodexError>{
+        match self.words.get(word) {
+            Some(entry) => Ok(entry.knowledge_score),
+            None => Err(CodexError::WordNotFound(word.to_string()))
+        }
     }
 }
