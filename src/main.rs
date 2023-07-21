@@ -134,20 +134,20 @@ fn practice(codex: &mut Codex) {
     ).run();
 
     if let Some(num) = num {
-        let num: usize = num.trim()
+        let pset_size: usize = num.trim()
             .parse::<i32>()
             .unwrap()
             .try_into()
             .expect("checked into to usize should work.");
         
-        for (word, def) in codex.generate_practice_set(num) {
+        for (i, (word, def)) in codex.generate_practice_set(pset_size).iter().enumerate() {
             println!("Do you know \"{}\"?", word);
             println!("Hit enter to show definition...");
 
             let mut buf = String::new();
             std::io::stdin().read_line(&mut buf).expect("stdin should work.");
 
-            println!("\"{}\": {}", word, def);
+            println!("({}/{}) \"{}\": {}", i + 1, pset_size, word, def);
 
             let correctness = ChoicePrompt::<Correctness>::new("Were you correct? ([c]orrect, [p]artially correct, [i]ncorrect)")
                 .add_choice(vec!["correct", "Correct", "c", "C"], Correctness::Correct)
